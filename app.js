@@ -38,6 +38,7 @@ let userLon = null;
 let sunPath = [];
 let currentHeading = 0; // 0 = North
 let currentPitch = 0;   // 0 = Horizon
+let currentRoll = 0;    // 0 = Level
 let hasRealOrientation = false;
 
 // Constants
@@ -199,6 +200,13 @@ function handleOrientation(event) {
     // Pitch (Altitude) 
     let pitch = Math.asin(clean_vz) * 180 / Math.PI;
 
+    // Roll (Leveling with Horizon)
+    // Local Y axis is the top of the phone. We find its X/Y world orientation to compute roll.
+    const gx = cX * sY; 
+    const gy = sX;
+    // Calculate how much the horizon is tilted on the screen
+    let roll = Math.atan2(gy, gx) - Math.PI/2;
+
     // Heading (Azimuth)
     let heading = 0;
     if (event.webkitCompassHeading) {
@@ -215,6 +223,7 @@ function handleOrientation(event) {
 
     currentHeading = heading;
     currentPitch = pitch;
+    currentRoll = roll;
 }
 
 // Shortest distance between two angles (0-360)
@@ -232,6 +241,13 @@ function renderLoop() {
         const pixelsPerDegreeX = canvas.width / FOV;
         // Assume portrait orientation, FOV scaling for height based on aspect ratio
         const pixelsPerDegreeY = pixelsPerDegreeX;
+
+        ctx.save();
+        
+        // Translate to the center of vision, apply screen roll, so AR aligns with real world rotation
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(currentRoll);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
         // Draw Sun Path line
         ctx.beginPath();
@@ -384,6 +400,8 @@ function renderLoop() {
         // Update Text
         elevDisplay.textContent = Math.round(currentPitch) + '°';
         azimDisplay.textContent = Math.round(currentHeading) + '°';
+        
+        ctx.restore();
     }
 
     requestAnimationFrame(renderLoop);
