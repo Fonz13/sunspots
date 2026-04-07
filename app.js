@@ -47,6 +47,7 @@ let COMPASS_OFFSET = 0;
 
 // Expose transformation matrix for 3D projection
 let currentMatrix = null;
+let currentMatrixHeading = 0;
  
 
 function resize() {
@@ -79,6 +80,19 @@ compassSlider.addEventListener('input', (e) => {
     COMPASS_OFFSET = parseFloat(e.target.value);
     compassDisplay.textContent = e.target.value;
 });
+
+const resetCalibrationBtn = document.getElementById('reset-calibration-btn');
+if (resetCalibrationBtn) {
+    resetCalibrationBtn.addEventListener('click', () => {
+        CAMERA_LONG_EDGE_FOV = 65;
+        fovSlider.value = 65;
+        fovDisplay.textContent = '65';
+        
+        COMPASS_OFFSET = 0;
+        compassSlider.value = 0;
+        compassDisplay.textContent = '0';
+    });
+}
 
 function showError(msg) {
     errorMsg.textContent = msg;
@@ -236,15 +250,18 @@ function handleOrientation(event) {
 
     // Heading (Azimuth)
     let heading = 0;
+    
+    // The rotation Matrix calculates an unaligned heading since iOS initializes `event.alpha` randomly
+    let matrixHeading = Math.atan2(v_cam_x, v_cam_y) * 180 / Math.PI;
+    if (matrixHeading < 0) matrixHeading += 360;
+    currentMatrixHeading = matrixHeading;
+
     if (event.webkitCompassHeading) {
         // iOS provides an absolute compass heading
         // We use it directly because iOS alpha is arbitrary (relative)
         heading = event.webkitCompassHeading;
     } else {
         // Android provides absolute alpha, so our Matrix gives true absolute Azimuth
-        // Math.atan2(East, North)
-        let matrixHeading = Math.atan2(v_cam_x, v_cam_y) * 180 / Math.PI;
-        if (matrixHeading < 0) matrixHeading += 360;
         heading = matrixHeading;
     }
 
@@ -273,15 +290,19 @@ function renderLoop() {
 
         ctx.save();
         
-        // Translate to the center of vision, apply screen roll
+        // Translate to the center of vision
         ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(currentRoll);
+        // We no longer rotate the screen canvas itself, because the mathematics of 
+        // the 3D Rotation Matrix intrinsically handles roll implicitly, preventing double rotations!
 
         // Project a sun position helper
         const project3D = (point) => {
             const altRad = point.altitude * Math.PI / 180;
-            // Apply arbitrary compass offset from user Settings to correct uncalibrated magnetic sensors
-            const aziRad = (point.azimuth + COMPASS_OFFSET) * Math.PI / 180;
+            
+            // Apply iOS arbitrary alpha alignment fix (locks the matrix to True North)
+            const iosOffset = currentHeading - currentMatrixHeading;
+            // Apply arbitrary compass offset from user Settings
+            const aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
             
             // World unit vector 
             const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
@@ -370,30 +391,38 @@ function renderLoop() {
             ctx.shadowBlur = 0; // reset
         }
 
-        // Draw Horizon (0° Altitude "Equator")
-        // To draw the horizon properly, we project a line using the pitch directly instead of 3D lines
-        // because the horizon is technically a curve on a rectlinear projection.
-        // For visual leveling, horizontal offset is roughly -pitch * focalLength
-        let horizonY = -Math.tan(currentPitch * Math.PI / 180) * focalLength;
-        
+        // Draw Curved True 3D Horizon (0° Altitude "Equator")
+        // Since we are using a rectilinear camera lens model, the horizon must be drawn as a 3D geometry curve!
         ctx.beginPath();
-        const maxSize = Math.max(canvas.width, canvas.height);
-        // Extend line far beyond screen bounds to ensure it spans the whole screen when rotated
-        ctx.moveTo(-maxSize, horizonY);
-        ctx.lineTo(canvas.width + maxSize, horizonY);
+        let horizonStarted = false;
+        for (let a = 0; a <= 360; a += 5) {
+            const pt = project3D({ altitude: 0, azimuth: a });
+            if (pt) {
+                if (!horizonStarted) {
+                    ctx.moveTo(pt.x, pt.y);
+                    horizonStarted = true;
+                } else {
+                    ctx.lineTo(pt.x, pt.y);
+                }
+            } else {
+                horizonStarted = false; // Lift pen if segment goes behind camera
+            }
+        }
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(16, 185, 129, 0.7)'; // Emerald green 
         ctx.stroke();
 
-        // Label the Horizon
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
-        ctx.font = '700 13px Outfit, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        // Draw label closer to center horizontally so it stays visible when rotated
-        ctx.fillText('HORIZON', -40, horizonY - 8);
-        ctx.shadowBlur = 0; // reset
+        // Label the Horizon exactly in front of the camera
+        const frontPt = project3D({ altitude: 0, azimuth: currentHeading });
+        if (frontPt) {
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
+            ctx.font = '700 13px Outfit, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillText('HORIZON', frontPt.x, frontPt.y - 8);
+            ctx.shadowBlur = 0; // reset
+        }
 
         // Draw Compass Marks on Equator
         const compassMarks = [
