@@ -42,7 +42,9 @@ let currentRoll = 0;    // 0 = Level
 let hasRealOrientation = false;
 
 // Constants
-const FOV = 80; // Widen FOV to "zoom out" the camera's AR layer
+// A typical smartphone camera has a field of view of about 65 degrees along its longest edge.
+// By matching physical hardware FOV, the AR altitude aligns correctly with reality.
+const CAMERA_LONG_EDGE_FOV = 65; 
 
 function resize() {
     canvas.width = window.innerWidth;
@@ -238,9 +240,13 @@ function renderLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (sunPath.length > 0) {
-        const pixelsPerDegreeX = canvas.width / FOV;
-        // Assume portrait orientation, FOV scaling for height based on aspect ratio
-        const pixelsPerDegreeY = pixelsPerDegreeX;
+        // Base pixels per degree on the long edge of the screen to closely match 
+        // the physical geometry of your hardware camera lens
+        const maxDimension = Math.max(canvas.width, canvas.height);
+        const pixelsPerDegree = maxDimension / CAMERA_LONG_EDGE_FOV;
+        
+        const pixelsPerDegreeX = pixelsPerDegree;
+        const pixelsPerDegreeY = pixelsPerDegree;
 
         ctx.save();
         
