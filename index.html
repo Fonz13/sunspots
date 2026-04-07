@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AR Sun Tracker</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <!-- Setup Overlay (for permissions) -->
     <div id="setup-screen" class="fs-container setup-bg">
@@ -28,7 +31,7 @@
     <div id="ar-container" class="fs-container" style="display: none;">
         <!-- Camera Background -->
         <video id="camera-bg" autoplay playsinline></video>
-        
+
         <!-- AR Canvas Overlay -->
         <canvas id="ar-canvas"></canvas>
 
@@ -44,7 +47,7 @@
             <!-- Telemetry Modal -->
             <div id="info-modal" class="glass-panel info-modal" style="display: none;">
                 <div class="info-header">
-                    <span class="info-title">Solar Telemetry</span>
+                    <span class="info-title">Information</span>
                     <button id="close-info-btn" class="close-btn">✖</button>
                 </div>
                 <div class="info-body">
@@ -62,7 +65,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="status-panel">
                 <div class="glass-pill">
                     <span id="status-indicator" class="dot loading"></span>
@@ -75,4 +78,5 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>
