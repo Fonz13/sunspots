@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AR Sun Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Setup Overlay (for permissions) -->
+    <div id="setup-screen" class="fs-container setup-bg">
+        <div class="glass-panel setup-panel">
+            <div class="sun-icon">☀️</div>
+            <h1>AR Sun Tracker</h1>
+            <p>Track the exact trajectory of the sun across the sky for any day of the year using augmented reality.</p>
+            <div class="permissions-list">
+                <div class="perm-item"><span>📷</span> Camera access required</div>
+                <div class="perm-item"><span>🧭</span> Compass/Motion access required</div>
+                <div class="perm-item"><span>📍</span> Location access required</div>
+            </div>
+            <button id="start-btn" class="glow-btn">Start AR Experience</button>
+            <p id="setup-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <!-- Main AR Interface -->
+    <div id="ar-container" class="fs-container" style="display: none;">
+        <!-- Camera Background -->
+        <video id="camera-bg" autoplay playsinline></video>
+        
+        <!-- AR Canvas Overlay -->
+        <canvas id="ar-canvas"></canvas>
+
+        <!-- UI Overlay -->
+        <div class="ui-overlay">
+            <div class="top-bar">
+                <div class="date-picker-container">
+                    <input type="date" id="date-picker" />
+                </div>
+                <button id="info-btn" class="glass-panel icon-btn">ℹ️</button>
+            </div>
+
+            <!-- Telemetry Modal -->
+            <div id="info-modal" class="glass-panel info-modal" style="display: none;">
+                <div class="info-header">
+                    <span class="info-title">Solar Telemetry</span>
+                    <button id="close-info-btn" class="close-btn">✖</button>
+                </div>
+                <div class="info-body">
+                    <div class="info-row">
+                        <span class="label">Elevation</span>
+                        <span id="current-elevation" class="value">--°</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Azimuth</span>
+                        <span id="current-azimuth" class="value">--°</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Timezone</span>
+                        <span id="current-timezone" class="value">--</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-panel">
+                <div class="glass-pill">
+                    <span id="status-indicator" class="dot loading"></span>
+                    <span id="status-msg">Initializing Sensors...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
