@@ -42,7 +42,7 @@ let currentRoll = 0;    // 0 = Level
 let hasRealOrientation = false;
 
 // Constants
-const FOV = 60; // Approximate horizontal Field of View in degrees
+const FOV = 80; // Widen FOV to "zoom out" the camera's AR layer
 
 function resize() {
     canvas.width = window.innerWidth;
@@ -197,8 +197,8 @@ function handleOrientation(event) {
     // Prevent floating point errors from exceeding [-1, 1] for asin
     const clean_vz = Math.max(-1, Math.min(1, v_cam_z));
     
-    // Pitch (Altitude) 
-    let pitch = Math.asin(clean_vz) * 180 / Math.PI;
+    // Pitch (Altitude) - INVERTED explicitly to resolve backward movement across various devices
+    let pitch = - (Math.asin(clean_vz) * 180 / Math.PI);
 
     // Roll (Leveling with Horizon)
     // Local Y axis is the top of the phone. We find its X/Y world orientation to compute roll.
