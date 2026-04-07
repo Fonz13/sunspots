@@ -382,8 +382,10 @@ function renderLoop() {
         let horizonY = canvas.height / 2 - (0 - currentPitch) * pixelsPerDegreeY;
         
         ctx.beginPath();
-        ctx.moveTo(0, horizonY);
-        ctx.lineTo(canvas.width, horizonY);
+        const maxSize = Math.max(canvas.width, canvas.height);
+        // Extend line far beyond screen bounds to ensure it spans the whole screen when rotated
+        ctx.moveTo(-maxSize, horizonY);
+        ctx.lineTo(canvas.width + maxSize, horizonY);
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(16, 185, 129, 0.7)'; // Emerald green 
         ctx.stroke();
@@ -394,7 +396,8 @@ function renderLoop() {
         ctx.textAlign = 'left';
         ctx.shadowBlur = 4;
         ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillText('HORIZON (0°)', 15, horizonY - 8);
+        // Draw label closer to center horizontally so it stays visible when rotated
+        ctx.fillText('HORIZON (0°)', canvas.width / 2 - 40, horizonY - 8);
         ctx.shadowBlur = 0; // reset
 
         // Update Text
