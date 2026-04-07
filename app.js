@@ -361,6 +361,57 @@ function renderLoop() {
         
         ctx.shadowBlur = 0; // Reset
 
+        // --- DRAW HOUR MARKS ---
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = '12px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        
+        for (let i = 0; i < sunPath.length - 1; i++) {
+            const d1 = new Date(sunPath[i].time);
+            const d2 = new Date(sunPath[i+1].time);
+            
+            // Check if we crossed into a new local hour
+            if (d1.getHours() !== d2.getHours()) {
+                const targetHour = d2.getHours();
+                
+                // Construct Date exactly at the hour
+                const dTarget = new Date(d2);
+                dTarget.setMinutes(0, 0, 0);
+                
+                // Linear interpolation ratio between the two 20-minute points
+                const diffTime = d2.getTime() - d1.getTime();
+                const ratio = diffTime > 0 ? (dTarget.getTime() - d1.getTime()) / diffTime : 0;
+                
+                let azi1 = sunPath[i].azimuth;
+                let azi2 = sunPath[i+1].azimuth;
+                let aDiff = azi2 - azi1;
+                if (aDiff > 180) aDiff -= 360;
+                else if (aDiff < -180) aDiff += 360;
+                
+                let targetAzi = azi1 + aDiff * ratio;
+                let targetAlt = sunPath[i].altitude + (sunPath[i+1].altitude - sunPath[i].altitude) * ratio;
+                
+                const pt = project3D({ altitude: targetAlt, azimuth: targetAzi });
+                
+                if (pt) {
+                    // Draw dot and time
+                    ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+                    ctx.shadowBlur = 4;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 5, 0, 2*Math.PI);
+                    ctx.fill();
+                    
+                    const ampm = targetHour >= 12 ? 'PM' : 'AM';
+                    const dispHour = targetHour % 12 || 12;
+                    ctx.fillText(`${dispHour} ${ampm}`, pt.x, pt.y - 14);
+                    
+                    ctx.shadowBlur = 0; // Reset
+                }
+            }
+        }
+
         // Find Current Sun Position (closest time to now)
         const now = new Date();
         let closestPoint = sunPath[0];
