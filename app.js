@@ -123,15 +123,48 @@ startBtn.addEventListener('click', async () => {
     }
 });
 
-async function fetchSunPath(dateStr) {
+function fetchSunPath(dateStr) {
     try {
-        const tzOffset = new Date().getTimezoneOffset();
-        const response = await fetch(`/api/sun-path?lat=${userLat}&lon=${userLon}&date=${dateStr}&offset=${tzOffset}`);
-        const data = await response.json();
-        sunPath = data;
+        let path = [];
+        let targetDate;
+        
+        if (dateStr) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                targetDate = new Date(parts[0], parseInt(parts[1]) - 1, parts[2], 0, 0, 0);
+            } else {
+                targetDate = new Date();
+                targetDate.setHours(0, 0, 0, 0);
+            }
+        } else {
+            targetDate = new Date();
+            targetDate.setHours(0, 0, 0, 0);
+        }
+
+        // Loop for 24 hours, every 20 minutes
+        for (let i = 0; i <= 24 * 60; i += 20) {
+            let currentDt = new Date(targetDate.getTime() + i * 60000);
+            
+            let sunPos = SunCalc.getPosition(currentDt, userLat, userLon);
+            
+            // Convert SunCalc azimuth (0 is South, Math.PI/2 is West) to compass heading (0 is North)
+            let azimuthDegrees = (sunPos.azimuth * 180 / Math.PI) + 180;
+            if (azimuthDegrees >= 360) azimuthDegrees -= 360;
+            
+            let altitudeDegrees = sunPos.altitude * 180 / Math.PI;
+            
+            path.push({
+                time: currentDt.toISOString(),
+                azimuth: azimuthDegrees,
+                altitude: altitudeDegrees
+            });
+        }
+        
+        sunPath = path;
         setStatus("Tracking Active", "active");
     } catch (e) {
-        setStatus("Failed to fetch path", "error");
+        console.error(e);
+        setStatus("Failed to calculate path", "error");
     }
 }
 
