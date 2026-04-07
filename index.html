@@ -41,10 +41,10 @@
                 <div class="date-picker-container">
                     <input type="date" id="date-picker" />
                 </div>
-                <button id="info-btn" class="glass-panel icon-btn">ℹ️</button>
+                <button id="info-btn" class="glass-panel icon-btn">⚙️</button>
             </div>
 
-            <!-- Telemetry Modal -->
+            <!-- Telemetry & Calibration Modal -->
             <div id="info-modal" class="glass-panel info-modal" style="display: none;">
                 <div class="info-header">
                     <span class="info-title">Information</span>
@@ -62,6 +62,15 @@
                     <div class="info-row">
                         <span class="label">Timezone</span>
                         <span id="current-timezone" class="value">--</span>
+                    </div>
+                    <hr style="border: 1px solid rgba(255,255,255,0.2); margin: 15px 0;">
+                    <div class="control-row">
+                        <label>Camera FOV: <span id="fov-display">65</span>°</label>
+                        <input type="range" id="fov-slider" min="40" max="100" value="65" style="width: 100%;">
+                    </div>
+                    <div class="control-row" style="margin-top: 15px;">
+                        <label>Compass Offset: <span id="compass-display">0</span>°</label>
+                        <input type="range" id="compass-slider" min="-90" max="90" value="0" style="width: 100%;">
                     </div>
                 </div>
             </div>

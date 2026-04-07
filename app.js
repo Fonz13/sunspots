@@ -41,10 +41,13 @@ let currentPitch = 0;   // 0 = Horizon
 let currentRoll = 0;    // 0 = Level
 let hasRealOrientation = false;
 
-// Constants
-// A typical smartphone camera has a field of view of about 65 degrees along its longest edge.
-// By matching physical hardware FOV, the AR altitude aligns correctly with reality.
-const CAMERA_LONG_EDGE_FOV = 65; 
+// Constants (now dynamic via settings sliders)
+let CAMERA_LONG_EDGE_FOV = 65; 
+let COMPASS_OFFSET = 0;
+
+// Expose transformation matrix for 3D projection
+let currentMatrix = null;
+ 
 
 function resize() {
     canvas.width = window.innerWidth;
@@ -60,6 +63,21 @@ datePicker.addEventListener('change', () => {
     if (userLat && userLon) {
         fetchSunPath(datePicker.value);
     }
+});
+
+// Calibration Bindings
+const fovSlider = document.getElementById('fov-slider');
+const fovDisplay = document.getElementById('fov-display');
+fovSlider.addEventListener('input', (e) => {
+    CAMERA_LONG_EDGE_FOV = parseFloat(e.target.value);
+    fovDisplay.textContent = e.target.value;
+});
+
+const compassSlider = document.getElementById('compass-slider');
+const compassDisplay = document.getElementById('compass-display');
+compassSlider.addEventListener('input', (e) => {
+    COMPASS_OFFSET = parseFloat(e.target.value);
+    compassDisplay.textContent = e.target.value;
 });
 
 function showError(msg) {
@@ -195,6 +213,13 @@ function handleOrientation(event) {
     const v_cam_x = - (cZ * sY + cY * sZ * sX);
     const v_cam_y = - (sZ * sY - cZ * cY * sX);
     const v_cam_z = - (cX * cY);
+    
+    // Save rotation matrix for rendering perfectly mapped 3D points
+    currentMatrix = [
+        cZ * cY - sZ * sX * sY,  -cX * sZ,  cY * sZ * sX + cZ * sY,
+        cY * sZ + cZ * sX * sY,  cZ * cX,   sZ * sY - cZ * cY * sX,
+        -cX * sY,                 sX,       cX * cY
+    ];
 
     // Prevent floating point errors from exceeding [-1, 1] for asin
     const clean_vz = Math.max(-1, Math.min(1, v_cam_z));
@@ -239,43 +264,61 @@ function angleDifference(a, b) {
 function renderLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (sunPath.length > 0) {
-        // Base pixels per degree on the long edge of the screen to closely match 
-        // the physical geometry of your hardware camera lens
-        const maxDimension = Math.max(canvas.width, canvas.height);
-        const pixelsPerDegree = maxDimension / CAMERA_LONG_EDGE_FOV;
+    if (sunPath.length > 0 && currentMatrix) {
         
-        const pixelsPerDegreeX = pixelsPerDegree;
-        const pixelsPerDegreeY = pixelsPerDegree;
+        // Use true 3D Rectilinear (Gnomonic) Projection for exact physical lens matching
+        const maxDimension = Math.max(canvas.width, canvas.height);
+        const fovRad = CAMERA_LONG_EDGE_FOV * Math.PI / 180;
+        const focalLength = (maxDimension / 2) / Math.tan(fovRad / 2);
 
         ctx.save();
         
-        // Translate to the center of vision, apply screen roll, so AR aligns with real world rotation
+        // Translate to the center of vision, apply screen roll
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.rotate(currentRoll);
-        ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-        // Draw Sun Path line
+        // Project a sun position helper
+        const project3D = (point) => {
+            const altRad = point.altitude * Math.PI / 180;
+            // Apply arbitrary compass offset from user Settings to correct uncalibrated magnetic sensors
+            const aziRad = (point.azimuth + COMPASS_OFFSET) * Math.PI / 180;
+            
+            // World unit vector 
+            const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
+            const wy = Math.cos(altRad) * Math.cos(aziRad);  // North
+            const wz = Math.sin(altRad);                     // Up
+            
+            // Multiply World Vector by INVERSE Rotation Matrix (M^T) to get Camera Local Vector
+            const m = currentMatrix;
+            const lx = m[0] * wx + m[3] * wy + m[6] * wz;
+            const ly = m[1] * wx + m[4] * wy + m[7] * wz;
+            const lz = m[2] * wx + m[5] * wy + m[8] * wz;
+            
+            if (lz >= 0) return null; // Behind camera
+            
+            // Map to Screen projection coordinates
+            return {
+                x: (lx / -lz) * focalLength,
+                y: -(ly / -lz) * focalLength  // Screen Y is inverse of mathematical Y
+            };
+        };
+
+        // Draw Sun Path line using pure 3D projection
         ctx.beginPath();
+        let pathStarted = false;
+        
         for (let i = 0; i < sunPath.length; i++) {
-            const point = sunPath[i];
+            const pt = project3D(sunPath[i]);
             
-            // Difference from center of screen
-            let aziDiff = angleDifference(point.azimuth, currentHeading);
-            let altDiff = point.altitude - currentPitch;
-            
-            const x = canvas.width / 2 + (aziDiff * pixelsPerDegreeX);
-            const y = canvas.height / 2 - (altDiff * pixelsPerDegreeY);
-
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                let prevAziDiff = angleDifference(sunPath[i-1].azimuth, currentHeading);
-                if (Math.abs(aziDiff - prevAziDiff) > 180) {
-                    ctx.moveTo(x, y); // Prevent drawing a line all the way across the screen when it wraps
+            if (pt) {
+                if (!pathStarted) {
+                    ctx.moveTo(pt.x, pt.y);
+                    pathStarted = true;
                 } else {
-                    ctx.lineTo(x, y);
+                    ctx.lineTo(pt.x, pt.y);
                 }
+            } else {
+                pathStarted = false; // Lift pen if segment goes behind camera
             }
         }
         // --- BRIGHTER BOLD SUN PATH ---
@@ -297,60 +340,6 @@ function renderLoop() {
         
         ctx.shadowBlur = 0; // Reset
 
-        // --- DRAW HOUR MARKS ---
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = '12px Outfit, sans-serif';
-        ctx.textAlign = 'center';
-        
-        for (let i = 0; i < sunPath.length - 1; i++) {
-            const d1 = new Date(sunPath[i].time);
-            const d2 = new Date(sunPath[i+1].time);
-            
-            // Check if we crossed into a new local hour
-            if (d1.getHours() !== d2.getHours()) {
-                const targetHour = d2.getHours();
-                
-                // Construct Date exactly at the hour
-                const dTarget = new Date(d2);
-                dTarget.setMinutes(0, 0, 0);
-                
-                // Linear interpolation ratio between the two 20-minute points
-                // Safely clamped just in case
-                const diffTime = d2.getTime() - d1.getTime();
-                const ratio = diffTime > 0 ? (dTarget.getTime() - d1.getTime()) / diffTime : 0;
-                
-                let azi1 = sunPath[i].azimuth;
-                let azi2 = sunPath[i+1].azimuth;
-                let aDiff = azi2 - azi1;
-                if (aDiff > 180) aDiff -= 360;
-                else if (aDiff < -180) aDiff += 360;
-                
-                let targetAzi = azi1 + aDiff * ratio;
-                let targetAlt = sunPath[i].altitude + (sunPath[i+1].altitude - sunPath[i].altitude) * ratio;
-                
-                let renderAziDiff = angleDifference(targetAzi, currentHeading);
-                let renderAltDiff = targetAlt - currentPitch;
-                
-                const hx = canvas.width / 2 + (renderAziDiff * pixelsPerDegreeX);
-                const hy = canvas.height / 2 - (renderAltDiff * pixelsPerDegreeY);
-                
-                // Draw dot and time
-                ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
-                ctx.shadowBlur = 4;
-                ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-
-                ctx.beginPath();
-                ctx.arc(hx, hy, 5, 0, 2*Math.PI);
-                ctx.fill();
-                
-                const ampm = targetHour >= 12 ? 'PM' : 'AM';
-                const dispHour = targetHour % 12 || 12;
-                ctx.fillText(`${dispHour} ${ampm}`, hx, hy - 14);
-                
-                ctx.shadowBlur = 0; // Reset
-            }
-        }
-
         // Find Current Sun Position (closest time to now)
         const now = new Date();
         let closestPoint = sunPath[0];
@@ -363,29 +352,29 @@ function renderLoop() {
             }
         }
 
-        // Draw the Sun ☀️
-        let aziDiff = angleDifference(closestPoint.azimuth, currentHeading);
-        let altDiff = closestPoint.altitude - currentPitch;
-        
-        const sunX = canvas.width / 2 + (aziDiff * pixelsPerDegreeX);
-        const sunY = canvas.height / 2 - (altDiff * pixelsPerDegreeY);
+        // Draw the Sun ☀️ if visible
+        const sunPos = project3D(closestPoint);
+        if (sunPos) {
+            const radGrad = ctx.createRadialGradient(sunPos.x, sunPos.y, 0, sunPos.x, sunPos.y, 40);
+            radGrad.addColorStop(0, 'rgba(255, 255, 255, 1)'); // White hot central core
+            radGrad.addColorStop(0.3, 'rgba(253, 224, 71, 1)');  // Bright yellow
+            radGrad.addColorStop(0.7, 'rgba(245, 158, 11, 0.8)'); // Soft orange glow
+            radGrad.addColorStop(1, 'rgba(217, 119, 6, 0)');     // Transparent edge
 
-        const radGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 40);
-        radGrad.addColorStop(0, 'rgba(255, 255, 255, 1)'); // White hot central core
-        radGrad.addColorStop(0.3, 'rgba(253, 224, 71, 1)');  // Bright yellow
-        radGrad.addColorStop(0.7, 'rgba(245, 158, 11, 0.8)'); // Soft orange glow
-        radGrad.addColorStop(1, 'rgba(217, 119, 6, 0)');     // Transparent edge
-
-        ctx.beginPath();
-        ctx.arc(sunX, sunY, 40, 0, 2 * Math.PI);
-        ctx.fillStyle = radGrad;
-        ctx.shadowBlur = 60;
-        ctx.shadowColor = '#FBBF24'; // Ambient yellow halo
-        ctx.fill();
-        ctx.shadowBlur = 0; // reset
+            ctx.beginPath();
+            ctx.arc(sunPos.x, sunPos.y, 40, 0, 2 * Math.PI);
+            ctx.fillStyle = radGrad;
+            ctx.shadowBlur = 60;
+            ctx.shadowColor = '#FBBF24'; // Ambient yellow halo
+            ctx.fill();
+            ctx.shadowBlur = 0; // reset
+        }
 
         // Draw Horizon (0° Altitude "Equator")
-        let horizonY = canvas.height / 2 - (0 - currentPitch) * pixelsPerDegreeY;
+        // To draw the horizon properly, we project a line using the pitch directly instead of 3D lines
+        // because the horizon is technically a curve on a rectlinear projection.
+        // For visual leveling, horizontal offset is roughly -pitch * focalLength
+        let horizonY = -Math.tan(currentPitch * Math.PI / 180) * focalLength;
         
         ctx.beginPath();
         const maxSize = Math.max(canvas.width, canvas.height);
@@ -403,8 +392,43 @@ function renderLoop() {
         ctx.shadowBlur = 4;
         ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
         // Draw label closer to center horizontally so it stays visible when rotated
-        ctx.fillText('HORIZON (0°)', canvas.width / 2 - 40, horizonY - 8);
+        ctx.fillText('HORIZON', -40, horizonY - 8);
         ctx.shadowBlur = 0; // reset
+
+        // Draw Compass Marks on Equator
+        const compassMarks = [
+            { azi: 0, label: 'N' },
+            { azi: 45, label: 'NE' },
+            { azi: 90, label: 'E' },
+            { azi: 135, label: 'SE' },
+            { azi: 180, label: 'S' },
+            { azi: 225, label: 'SW' },
+            { azi: 270, label: 'W' },
+            { azi: 315, label: 'NW' }
+        ];
+
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
+        ctx.font = '600 14px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+
+        for (let mark of compassMarks) {
+            const pt = project3D({ altitude: 0, azimuth: mark.azi });
+            if (pt) {
+                // Draw a tick mark slightly crossing the horizon
+                ctx.beginPath();
+                ctx.moveTo(pt.x, pt.y - 6);
+                ctx.lineTo(pt.x, pt.y + 6);
+                ctx.stroke();
+                
+                // Draw the label
+                ctx.fillText(mark.label, pt.x, pt.y - 12);
+            }
+        }
+        ctx.shadowBlur = 0;
 
         // Update Text
         elevDisplay.textContent = Math.round(currentPitch) + '°';
