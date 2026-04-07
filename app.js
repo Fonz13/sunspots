@@ -174,38 +174,43 @@ function handleOrientation(event) {
     }
     hasRealOrientation = true;
 
-    let rawBeta = event.beta;
-    let rawGamma = event.gamma;
-    let rawAlpha = event.alpha;
+    // Use W3C Rotation Matrix to avoid all Gimbal Locks and Euler singularity flips
+    // Convert to radians
+    const alpha = event.alpha ? event.alpha * Math.PI / 180 : 0;
+    const beta = event.beta ? event.beta * Math.PI / 180 : 0;
+    const gamma = event.gamma ? event.gamma * Math.PI / 180 : 0;
 
-    // Many devices experience a "gimbal lock" or flip at exactly vertical (horizon).
-    // If we pass the zenith/horizon vertically, beta reflects and gamma flips to ~180.
-    if (rawGamma !== null && Math.abs(rawGamma) > 90) {
-        if (rawBeta > 0) rawBeta = 180 - rawBeta;
-        else rawBeta = -180 - rawBeta;
+    const cX = Math.cos(beta);
+    const cY = Math.cos(gamma);
+    const cZ = Math.cos(alpha);
+    const sX = Math.sin(beta);
+    const sY = Math.sin(gamma);
+    const sZ = Math.sin(alpha);
 
-        if (rawAlpha !== null) {
-            rawAlpha += 180;
-            if (rawAlpha >= 360) rawAlpha -= 360;
-        }
-    }
+    // We calculate where the BACK of the phone (-Z axis) is pointing in 3D space.
+    // This is mathematically immune to the beta=90° gimbal lock glitch!
+    const v_cam_x = - (cZ * sY + cY * sZ * sX);
+    const v_cam_y = - (sZ * sY - cZ * cY * sX);
+    const v_cam_z = - (cX * cY);
 
-    // Heading calculations (Compass)
+    // Prevent floating point errors from exceeding [-1, 1] for asin
+    const clean_vz = Math.max(-1, Math.min(1, v_cam_z));
+    
+    // Pitch (Altitude) 
+    let pitch = Math.asin(clean_vz) * 180 / Math.PI;
+
+    // Heading (Azimuth)
     let heading = 0;
     if (event.webkitCompassHeading) {
         // iOS provides an absolute compass heading
+        // We use it directly because iOS alpha is arbitrary (relative)
         heading = event.webkitCompassHeading;
-    } else if (rawAlpha !== null) {
-        // Android / webkit absolute
-        heading = 360 - rawAlpha;
-    }
-    
-    // Pitch calculation (Altitude)
-    // Beta is 90 when held vertically up.
-    // If pitch > 0, we are looking at the sky. If pitch < 0, looking downward.
-    let pitch = 0;
-    if (rawBeta !== null) {
-        pitch = rawBeta - 90; 
+    } else {
+        // Android provides absolute alpha, so our Matrix gives true absolute Azimuth
+        // Math.atan2(East, North)
+        let matrixHeading = Math.atan2(v_cam_x, v_cam_y) * 180 / Math.PI;
+        if (matrixHeading < 0) matrixHeading += 360;
+        heading = matrixHeading;
     }
 
     currentHeading = heading;
