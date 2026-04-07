@@ -174,23 +174,38 @@ function handleOrientation(event) {
     }
     hasRealOrientation = true;
 
+    let rawBeta = event.beta;
+    let rawGamma = event.gamma;
+    let rawAlpha = event.alpha;
+
+    // Many devices experience a "gimbal lock" or flip at exactly vertical (horizon).
+    // If we pass the zenith/horizon vertically, beta reflects and gamma flips to ~180.
+    if (rawGamma !== null && Math.abs(rawGamma) > 90) {
+        if (rawBeta > 0) rawBeta = 180 - rawBeta;
+        else rawBeta = -180 - rawBeta;
+
+        if (rawAlpha !== null) {
+            rawAlpha += 180;
+            if (rawAlpha >= 360) rawAlpha -= 360;
+        }
+    }
+
     // Heading calculations (Compass)
     let heading = 0;
     if (event.webkitCompassHeading) {
-        // iOS
+        // iOS provides an absolute compass heading
         heading = event.webkitCompassHeading;
-    } else if (event.alpha !== null) {
+    } else if (rawAlpha !== null) {
         // Android / webkit absolute
-        // alpha goes from 0 to 360 counter-clockwise.
-        heading = 360 - event.alpha;
+        heading = 360 - rawAlpha;
     }
     
     // Pitch calculation (Altitude)
-    // Beta is [-180, 180]. Device held vertically up -> beta ≈ 90.
-    // If we want 0 to be horizon and 90 to be zenith:
+    // Beta is 90 when held vertically up.
+    // If pitch > 0, we are looking at the sky. If pitch < 0, looking downward.
     let pitch = 0;
-    if (event.beta !== null) {
-        pitch = 90 - event.beta;
+    if (rawBeta !== null) {
+        pitch = rawBeta - 90; 
     }
 
     currentHeading = heading;
