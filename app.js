@@ -1,3 +1,5 @@
+import * as SunCalc from './suncalc.js';
+
 const setupScreen = document.getElementById('setup-screen');
 const arContainer = document.getElementById('ar-container');
 const startBtn = document.getElementById('start-btn');
