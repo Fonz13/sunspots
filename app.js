@@ -126,6 +126,26 @@ if (resetCalibrationBtn) {
     });
 }
 
+function stopCamera() {
+    if (video.srcObject) {
+        // Stop all media tracks hardware-side
+        const tracks = video.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
+    }
+}
+
+async function startCamera() {
+    if (video.srcObject) return;
+    try {
+        const constraints = { video: { facingMode: "environment" } };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+    } catch (err) {
+        console.error("Camera access failed:", err);
+    }
+}
+
 function showError(msg) {
     errorMsg.textContent = msg;
     errorMsg.style.display = 'block';
@@ -148,13 +168,7 @@ startBtn.addEventListener('click', async () => {
         }
 
         setStatus("Accessing camera...");
-        
-        // Start Camera
-        const constraints = {
-            video: { facingMode: "environment" }
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = stream;
+        await startCamera();
 
         // Transition UI
         setupScreen.style.display = 'none';
@@ -267,6 +281,8 @@ async function setMode(mode) {
         video.style.display = 'block';
         svContainer.style.display = 'none';
         setStatus("Tracking Active", "active");
+        
+        startCamera(); // Restart camera to resume AR
     } else {
         svModeBtn.classList.add('active');
         arModeBtn.classList.remove('active');
@@ -274,6 +290,9 @@ async function setMode(mode) {
         infoBtn.style.display = 'none'; // Hide settings in Street View
         video.style.display = 'none';
         svContainer.style.display = 'block';
+        
+        stopCamera(); // Turn off camera hardware to save battery
+        
         
         if (!panorama) {
             initStreetView();
