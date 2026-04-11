@@ -225,6 +225,8 @@ function fetchSunPath(dateStr) {
             
             path.push({
                 time: currentDt.toISOString(),
+                dateObj: currentDt,
+                timestamp: currentDt.getTime(),
                 azimuth: azimuthDegrees,
                 altitude: altitudeDegrees
             });
@@ -648,8 +650,8 @@ function renderLoop() {
         ctx.textAlign = 'center';
         
         for (let i = 0; i < sunPath.length - 1; i++) {
-            const d1 = new Date(sunPath[i].time);
-            const d2 = new Date(sunPath[i+1].time);
+            const d1 = sunPath[i].dateObj;
+            const d2 = sunPath[i+1].dateObj;
             
             // Check if we crossed into a new local hour
             if (d1.getHours() !== d2.getHours()) {
@@ -694,11 +696,11 @@ function renderLoop() {
         }
 
         // Find Current Sun Position (closest time to now)
-        const now = new Date();
+        const nowMs = Date.now();
         let closestPoint = sunPath[0];
         let minDiff = Infinity;
         for (let point of sunPath) {
-            const diff = Math.abs(new Date(point.time) - now);
+            const diff = Math.abs(point.timestamp - nowMs);
             if (diff < minDiff) {
                 minDiff = diff;
                 closestPoint = point;
