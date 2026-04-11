@@ -458,7 +458,7 @@ p {
 
 .search-container {
     flex: 1;
-    max-width: 300px;
+    max-width: 450px; /* Increased from 300px for larger default width */
 }
 
 .search-container input {
@@ -466,10 +466,10 @@ p {
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #ffffff !important;
-    padding: 10px 20px;
+    padding: 12px 20px; /* Made globally taller */
     border-radius: 30px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 15px; /* Increased globally */
     outline: none;
 }
 
@@ -516,7 +516,7 @@ p {
 }
 
 /* Mobile search style adjustment */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
     .top-bar {
         flex-wrap: wrap;
         justify-content: center;
@@ -524,16 +524,27 @@ p {
 
     .search-container {
         order: 3;
-        width: 100%;
+        flex: 0 0 100%; /* Force it to wrap onto its own row */
         max-width: none;
         margin-top: 10px;
     }
-}
 
-/* Hide Google Maps Dev API Error Popups completely */
-.gm-err-container {
-    display: none !important;
-}
-.dismissButton {
-    display: none !important;
+    .search-group {
+        width: 100%;
+    }
+
+    .search-container input {
+        flex: 1;
+        /* Take up all available space */
+        font-size: 16px;
+        /* Larger font for readability and prevents iOS auto-zoom */
+        padding: 12px 20px;
+        /* Larger touch target */
+    }
+
+    .help-btn {
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+    }
 }
