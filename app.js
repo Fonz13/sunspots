@@ -272,9 +272,10 @@ function initStreetView() {
             const pov = panorama.getPov();
             currentHeading = pov.heading;
             currentPitch = pov.pitch;
-            // Approximate FOV from zoom level
-            // zoom 0 = ~180deg, zoom 1 = ~90deg, zoom 2 = ~45deg
-            CAMERA_LONG_EDGE_FOV = 180 / Math.pow(2, panorama.getZoom());
+            // Limit max FOV to 125 degrees to prevent the sun path from distorting/disappearing at zoom 0
+            const rawFOV = 180 / Math.pow(2, panorama.getZoom());
+            CAMERA_LONG_EDGE_FOV = Math.min(125, rawFOV);
+            
             fovSlider.value = CAMERA_LONG_EDGE_FOV;
             fovDisplay.textContent = Math.round(CAMERA_LONG_EDGE_FOV);
         }

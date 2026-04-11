@@ -386,6 +386,35 @@ p {
     z-index: 1;
 }
 
+/* Ensure Google Autocomplete results are visible above the AR overlay */
+.pac-container {
+    z-index: 10000 !important;
+    background-color: #1e293b !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    margin-top: 5px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+}
+
+.pac-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding: 10px 15px !important;
+    color: #f8fafc !important;
+    cursor: pointer;
+}
+
+.pac-item:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.pac-item-query {
+    color: #fff !important;
+}
+
+.pac-matched {
+    color: #f59e0b !important;
+}
+
 /* Mobile search style adjustment */
 @media (max-width: 600px) {
     .top-bar {
