@@ -37,7 +37,7 @@ window.addEventListener('touchstart', closeInfoOutside);
 const arModeBtn = document.getElementById('ar-mode-btn');
 const svModeBtn = document.getElementById('sv-mode-btn');
 const searchContainer = document.getElementById('search-container');
-const locationInput = document.getElementById('location-input');
+const locationInput = document.getElementById('loc-search');
 const svContainer = document.getElementById('street-view');
 
 // State
@@ -149,7 +149,7 @@ startBtn.addEventListener('click', async () => {
             (pos) => {
                 userLat = pos.coords.latitude;
                 userLon = pos.coords.longitude;
-                setStatus("Fetching solar data...");
+                setStatus("Location found!");
                 fetchSunPath(datePicker.value);
 
                 // Start Orientation tracking
@@ -292,19 +292,48 @@ function initStreetView() {
 function initAutocomplete() {
     if (!google.maps.places) return;
     autocomplete = new google.maps.places.Autocomplete(locationInput);
+    
+    // Original autocomplete listener
     autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
         if (place.geometry && place.geometry.location) {
             const loc = place.geometry.location;
-            if (panorama && currentMode === 'sv') {
-                panorama.setPosition(loc);
-            } else {
-                userLat = loc.lat();
-                userLon = loc.lng();
-                fetchSunPath(datePicker.value);
+            updateToLocation(loc.lat(), loc.lng());
+        }
+    });
+
+    // New: Listen for pasted Google Maps URLs
+    locationInput.addEventListener('input', () => {
+        const val = locationInput.value;
+        if (val.includes('google.com/maps') || val.includes('maps.app.goo.gl')) {
+            // Regex for @lat,lng
+            const atRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+            // Regex for !3d...!4d
+            const dataRegex = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+            
+            let match = val.match(dataRegex) || val.match(atRegex);
+            
+            if (match) {
+                const lat = parseFloat(match[1]);
+                const lon = parseFloat(match[2]);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    updateToLocation(lat, lon);
+                    locationInput.value = `Pos: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                    locationInput.blur();
+                }
             }
         }
     });
+}
+
+// Helper to update location and panorama
+function updateToLocation(lat, lon) {
+    userLat = lat;
+    userLon = lon;
+    if (panorama && currentMode === 'sv') {
+        panorama.setPosition({ lat, lng: lon });
+    }
+    fetchSunPath(datePicker.value);
 }
 
 function handleOrientation(event) {

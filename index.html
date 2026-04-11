@@ -46,7 +46,7 @@
                     <button id="sv-mode-btn">🗺️ Street</button>
                 </div>
                 <div class="search-container" id="search-container" style="display: none;">
-                    <input type="text" id="location-input" placeholder="Search location..." class="glass-pill" />
+                    <input type="text" id="loc-search" placeholder="Search or paste Maps link..." class="glass-pill" />
                 </div>
                 <div class="date-picker-container">
                     <input type="date" id="date-picker" />
@@ -97,7 +97,7 @@
         </div>
     </div>
 
-    <script src="https://maps.googleapis.com/maps/api/js?v=weekly&libraries=places"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?v=weekly&libraries=places"></script>
     <script type="module" src="app.js"></script>
 </body>
 
