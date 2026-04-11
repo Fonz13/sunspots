@@ -19,20 +19,46 @@ const infoModal = document.getElementById('info-modal');
 const closeInfoBtn = document.getElementById('close-info-btn');
 const tzDisplay = document.getElementById('current-timezone');
 
+const arModeBtn = document.getElementById('ar-mode-btn');
+const svModeBtn = document.getElementById('sv-mode-btn');
+const searchContainer = document.getElementById('search-container');
+const locationInput = document.getElementById('loc-search');
+const svContainer = document.getElementById('street-view');
+const searchHelpBtn = document.getElementById('search-help-btn');
+const searchHelpModal = document.getElementById('search-help-modal');
+const closeSearchHelpBtn = document.getElementById('close-search-help-btn');
+
 tzDisplay.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
 
-infoBtn.addEventListener('click', () => infoModal.style.display = 'block');
-closeInfoBtn.addEventListener('click', () => infoModal.style.display = 'none');
+// Modal Management Logic
+function closeAllModals() {
+    infoModal.style.display = 'none';
+    searchHelpModal.style.display = 'none';
+}
 
-function closeInfoOutside(e) {
+function handleOutsideClick(e) {
+    // Check Settings Modal
     if (infoModal.style.display === 'block' && 
         !infoModal.contains(e.target) && 
         !infoBtn.contains(e.target)) {
         infoModal.style.display = 'none';
     }
+    // Check Search Help Modal
+    if (searchHelpModal.style.display === 'block' && 
+        !searchHelpModal.contains(e.target) && 
+        !searchHelpBtn.contains(e.target)) {
+        searchHelpModal.style.display = 'none';
+    }
 }
-window.addEventListener('mousedown', closeInfoOutside);
-window.addEventListener('touchstart', closeInfoOutside);
+
+infoBtn.addEventListener('click', () => infoModal.style.display = 'block');
+closeInfoBtn.addEventListener('click', () => infoModal.style.display = 'none');
+
+searchHelpBtn.addEventListener('click', () => searchHelpModal.style.display = 'block');
+closeSearchHelpBtn.addEventListener('click', () => searchHelpModal.style.display = 'none');
+
+window.addEventListener('mousedown', handleOutsideClick);
+window.addEventListener('touchstart', handleOutsideClick);
 
 // State
 let userLat = null;
@@ -42,6 +68,10 @@ let currentHeading = 0; // 0 = North
 let currentPitch = 0;   // 0 = Horizon
 let currentRoll = 0;    // 0 = Level
 let hasRealOrientation = false;
+
+let currentMode = 'ar'; // 'ar' or 'sv'
+let panorama = null;
+let autocomplete = null;
 
 // Constants (now dynamic via settings sliders)
 let CAMERA_LONG_EDGE_FOV = 65; 
@@ -83,7 +113,7 @@ compassSlider.addEventListener('input', (e) => {
     compassDisplay.textContent = e.target.value;
 });
 
-const resetCalibrationBtn = document.getElementById('reset-calibration-btn');
+const resetCalibrationBtn = document.getElementById('reset-calibration');
 if (resetCalibrationBtn) {
     resetCalibrationBtn.addEventListener('click', () => {
         CAMERA_LONG_EDGE_FOV = 65;
@@ -130,13 +160,16 @@ startBtn.addEventListener('click', async () => {
         setupScreen.style.display = 'none';
         arContainer.style.display = 'block';
 
+        initModeToggles();
+        initSearch();
+
         // Get Location
         setStatus("Finding location...");
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 userLat = pos.coords.latitude;
                 userLon = pos.coords.longitude;
-                setStatus("Fetching solar data...");
+                setStatus("Location found!");
                 fetchSunPath(datePicker.value);
 
                 // Start Orientation tracking
@@ -198,11 +231,217 @@ function fetchSunPath(dateStr) {
         }
         
         sunPath = path;
-        setStatus("Tracking Active", "active");
+        setStatus(currentMode === 'ar' ? "Tracking Active" : "Street View Mode", "active");
     } catch (e) {
         console.error(e);
         setStatus("Failed to calculate path", "error");
     }
+}
+
+function initModeToggles() {
+    arModeBtn.addEventListener('click', () => setMode('ar'));
+    svModeBtn.addEventListener('click', () => setMode('sv'));
+}
+
+async function setMode(mode) {
+    if (currentMode === mode) return;
+
+    if (mode === 'sv' && (!userLat || !userLon)) {
+        setStatus("Waiting for location...", "loading");
+        // Keep trying or just wait for the first geolocation success to trigger it
+        return;
+    }
+
+    currentMode = mode;
+    
+    // Close any open modals when switching modes
+    closeAllModals();
+
+    if (mode === 'ar') {
+        arModeBtn.classList.add('active');
+        svModeBtn.classList.remove('active');
+        searchContainer.style.display = 'none';
+        infoBtn.style.display = 'flex'; // Show settings in AR
+        video.style.display = 'block';
+        svContainer.style.display = 'none';
+        setStatus("Tracking Active", "active");
+    } else {
+        svModeBtn.classList.add('active');
+        arModeBtn.classList.remove('active');
+        searchContainer.style.display = 'block';
+        infoBtn.style.display = 'none'; // Hide settings in Street View
+        video.style.display = 'none';
+        svContainer.style.display = 'block';
+        
+        if (!panorama) {
+            initStreetView();
+        }
+        setStatus("Street View Mode", "active");
+    }
+}
+
+function initStreetView() {
+    panorama = new google.maps.StreetViewPanorama(svContainer, {
+        position: { lat: userLat, lng: userLon },
+        pov: { heading: currentHeading, pitch: currentPitch },
+        zoom: 1,
+        addressControl: false,
+        showRoadLabels: false,
+        zoomControl: false,
+        panControl: false,
+        fullscreenControl: false
+    });
+
+    panorama.addListener('pov_changed', () => {
+        if (currentMode === 'sv') {
+            const pov = panorama.getPov();
+            currentHeading = pov.heading;
+            currentPitch = pov.pitch;
+            // Street View FOV is now handled purely in renderLoop to protect AR settings
+
+        }
+    });
+
+    panorama.addListener('position_changed', () => {
+        const pos = panorama.getPosition();
+        userLat = pos.lat();
+        userLon = pos.lng();
+        fetchSunPath(datePicker.value);
+    });
+
+    // Auto-dismiss the "For development purposes only" error popup safely
+    const observer = new MutationObserver(() => {
+        const dismissBtn = document.querySelector('.dismissButton');
+        if (dismissBtn) {
+            dismissBtn.click();
+            observer.disconnect(); // Stop observing once it's clicked
+        }
+    });
+    observer.observe(svContainer, { childList: true, subtree: true });
+}
+
+async function resolveCompoundCode(plusPart, cityPart) {
+    try {
+        setStatus(`Finding ${cityPart}...`, "loading");
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityPart)}&format=json&limit=1`);
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+            const cityLat = parseFloat(data[0].lat);
+            const cityLon = parseFloat(data[0].lon);
+            
+            const fullCode = OpenLocationCode.recoverNearest(plusPart, cityLat, cityLon);
+            if (OpenLocationCode.isFull(fullCode)) {
+                const decoded = OpenLocationCode.decode(fullCode);
+                updateToLocation(decoded.latitudeCenter, decoded.longitudeCenter);
+                locationInput.value = `📍 ${fullCode}`;
+                locationInput.blur();
+                setStatus("Location Synchronized", "active");
+            }
+        } else {
+            setStatus("Could not find city", "error");
+        }
+    } catch (e) {
+        console.error("Compound Resolution Error:", e);
+        setStatus("Network Error", "error");
+    }
+}
+async function initSearch() {
+    // 2. Listen for pasting Google Maps URLs or direct coordinates
+    locationInput.addEventListener('input', () => {
+        const val = locationInput.value.trim();
+        if (!val) return;
+
+        // 1. Check for Full URLs
+        if (val.includes('google.com/maps') || val.includes('maps.app.goo.gl')) {
+            const atRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+            const dataRegex = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+            let match = val.match(dataRegex) || val.match(atRegex);
+            if (match) {
+                const lat = parseFloat(match[1]);
+                const lon = parseFloat(match[2]);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    updateToLocation(lat, lon);
+                    locationInput.value = `Pos: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                    locationInput.blur();
+                    return;
+                }
+            }
+            
+            // If it's a short link, we unfortunately can't parse it in JS without an API/Backend
+            if (val.includes('maps.app.goo.gl')) {
+                setStatus("Short links require API Key", "loading");
+            }
+        } 
+        // 2. Check for Plus Codes (e.g., 8FVC9G7F+9V, 82HG+M3, or P45J+M4 Glendale)
+        else if (val.includes('+')) {
+            const plusCodeRegex = /[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,8}/i;
+            const match = val.match(plusCodeRegex);
+            
+            if (match && typeof OpenLocationCode !== 'undefined') {
+                const code = match[0].toUpperCase();
+                const remainder = val.replace(match[0], '').trim();
+
+                // If there's a city/locality name after the code
+                if (remainder && remainder.length > 2) {
+                    resolveCompoundCode(code, remainder);
+                } else {
+                    try {
+                        let fullCode = code;
+                        // Local recovery using current location
+                        if (OpenLocationCode.isShort(code)) {
+                            if (userLat !== null && userLon !== null) {
+                                fullCode = OpenLocationCode.recoverNearest(code, userLat, userLon);
+                            } else {
+                                setStatus("Need location to use short code", "loading");
+                                return;
+                            }
+                        }
+
+                        if (OpenLocationCode.isFull(fullCode)) {
+                            const decoded = OpenLocationCode.decode(fullCode);
+                            updateToLocation(decoded.latitudeCenter, decoded.longitudeCenter);
+                            locationInput.value = `📍 ${fullCode}`;
+                            locationInput.blur();
+                        }
+                    } catch (e) {
+                        console.error("Plus Code Error:", e);
+                    }
+                }
+            }
+        }
+        // 3. Check for Direct Coordinates (Lat, Lon)
+        else {
+            const coordRegex = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+            const match = val.match(coordRegex);
+            if (match) {
+                const lat = parseFloat(match[1]);
+                const lon = parseFloat(match[2]);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    updateToLocation(lat, lon);
+                    locationInput.value = `Pos: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                    locationInput.blur();
+                }
+            }
+        }
+    });
+
+    // Support for "Enter" key
+    locationInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            locationInput.blur();
+        }
+    });
+}
+
+// Helper to update location and panorama
+function updateToLocation(lat, lon) {
+    userLat = lat;
+    userLon = lon;
+    if (panorama && currentMode === 'sv') {
+        panorama.setPosition({ lat, lng: lon });
+    }
+    fetchSunPath(datePicker.value);
 }
 
 function handleOrientation(event) {
@@ -267,6 +506,8 @@ function handleOrientation(event) {
         heading = matrixHeading;
     }
 
+    if (currentMode !== 'ar') return;
+
     currentHeading = heading;
     currentPitch = pitch;
     currentRoll = roll;
@@ -280,15 +521,77 @@ function angleDifference(a, b) {
     return diff;
 }
 
+function getProjectedPoint(point, focalLength) {
+    const altRad = point.altitude * Math.PI / 180;
+    let aziRad;
+    let m;
+
+    if (currentMode === 'ar' && currentMatrix) {
+        // Apply iOS arbitrary alpha alignment fix (locks the matrix to True North)
+        const iosOffset = currentHeading - currentMatrixHeading;
+        aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
+        m = currentMatrix;
+    } else if (currentMode === 'sv') {
+        // Use raw azimuth: SV imagery is already True-North aligned.
+        // COMPASS_OFFSET is removed here to prevent sensor calibration from affecting the map.
+        aziRad = point.azimuth * Math.PI / 180;
+
+        // Construct 3D matrix for Street View (Heading, Pitch, 0 Roll)
+        const h = currentHeading * Math.PI / 180;
+        const p = currentPitch * Math.PI / 180;
+        const cH = Math.cos(h);
+        const sH = Math.sin(h);
+        const cP = Math.cos(p);
+        const sP = Math.sin(p);
+
+        // Matrix columns are Camera Axes in World Space
+        // m[0,3,6] = Cam X, m[1,4,7] = Cam Y, m[2,5,8] = Cam Z
+        m = [
+            cH, -sH * sP, -sH * cP,
+            -sH, -cH * sP, -cH * cP,
+            0, cP, -sP
+        ];
+    } else {
+        return null;
+    }
+
+    // World unit vector 
+    const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
+    const wy = Math.cos(altRad) * Math.cos(aziRad);  // North
+    const wz = Math.sin(altRad);                     // Up
+
+    // Multiply World Vector by INVERSE Rotation Matrix (M^T) to get Camera Local Vector
+    const lx = m[0] * wx + m[3] * wy + m[6] * wz;
+    const ly = m[1] * wx + m[4] * wy + m[7] * wz;
+    const lz = m[2] * wx + m[5] * wy + m[8] * wz;
+
+    if (lz >= 0) return null; // Behind camera
+
+    return {
+        x: (lx / -lz) * focalLength,
+        y: -(ly / -lz) * focalLength
+    };
+}
+
 function renderLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (sunPath.length > 0 && currentMatrix) {
+    if (sunPath.length > 0 && (currentMatrix || currentMode === 'sv')) {
         
-        // Use true 3D Rectilinear (Gnomonic) Projection for exact physical lens matching
-        const maxDimension = Math.max(canvas.width, canvas.height);
-        const fovRad = CAMERA_LONG_EDGE_FOV * Math.PI / 180;
-        const focalLength = (maxDimension / 2) / Math.tan(fovRad / 2);
+        // In Street View, Google Maps FOV applies to the width. 
+        // In AR mode, camera FOV usually applies to the long edge.
+        const dimension = (currentMode === 'sv') ? canvas.width : Math.max(canvas.width, canvas.height);
+        
+        let fovRad;
+        if (currentMode === 'sv') {
+            const pov = panorama.getPov();
+            const fov = pov.fov !== undefined ? pov.fov : 180 / Math.pow(2, panorama.getZoom());
+            fovRad = Math.min(110, fov) * Math.PI / 180;
+        } else {
+            fovRad = CAMERA_LONG_EDGE_FOV * Math.PI / 180;
+        }
+
+        const focalLength = (dimension / 2) / Math.tan(fovRad / 2);
 
         ctx.save();
         
@@ -299,31 +602,7 @@ function renderLoop() {
 
         // Project a sun position helper
         const project3D = (point) => {
-            const altRad = point.altitude * Math.PI / 180;
-            
-            // Apply iOS arbitrary alpha alignment fix (locks the matrix to True North)
-            const iosOffset = currentHeading - currentMatrixHeading;
-            // Apply arbitrary compass offset from user Settings
-            const aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
-            
-            // World unit vector 
-            const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
-            const wy = Math.cos(altRad) * Math.cos(aziRad);  // North
-            const wz = Math.sin(altRad);                     // Up
-            
-            // Multiply World Vector by INVERSE Rotation Matrix (M^T) to get Camera Local Vector
-            const m = currentMatrix;
-            const lx = m[0] * wx + m[3] * wy + m[6] * wz;
-            const ly = m[1] * wx + m[4] * wy + m[7] * wz;
-            const lz = m[2] * wx + m[5] * wy + m[8] * wz;
-            
-            if (lz >= 0) return null; // Behind camera
-            
-            // Map to Screen projection coordinates
-            return {
-                x: (lx / -lz) * focalLength,
-                y: -(ly / -lz) * focalLength  // Screen Y is inverse of mathematical Y
-            };
+            return getProjectedPoint(point, focalLength);
         };
 
         // Draw Sun Path line using pure 3D projection

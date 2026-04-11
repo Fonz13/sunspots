@@ -35,19 +35,26 @@
         <!-- AR Canvas Overlay -->
         <canvas id="ar-canvas"></canvas>
 
+        <!-- Google Street View Container -->
+        <div id="street-view" style="display: none;"></div>
+
         <!-- UI Overlay -->
         <div class="ui-overlay">
             <div class="top-bar">
+                <div class="mode-toggle glass-pill">
+                    <button id="ar-mode-btn" class="active">📷 AR</button>
+                    <button id="sv-mode-btn">🗺️ Street</button>
+                </div>
                 <div class="date-picker-container">
                     <input type="date" id="date-picker" />
                 </div>
                 <button id="info-btn" class="glass-panel icon-btn">⚙️</button>
             </div>
 
-            <!-- Telemetry & Calibration Modal -->
+            <!-- Telemetry & Calibration Panel (Settings) -->
             <div id="info-modal" class="glass-panel info-modal" style="display: none;">
                 <div class="info-header">
-                    <span class="info-title">Information</span>
+                    <span class="info-title">Calibration & Info</span>
                     <button id="close-info-btn" class="close-btn">✖</button>
                 </div>
                 <div class="info-body">
@@ -63,30 +70,77 @@
                         <span class="label">Timezone</span>
                         <span id="current-timezone" class="value">--</span>
                     </div>
-                    <hr style="border: 1px solid rgba(255,255,255,0.2); margin: 15px 0;">
-                    <div class="control-row">
-                        <label>Camera FOV: <span id="fov-display">65</span>°</label>
-                        <input type="range" id="fov-slider" min="40" max="100" value="65" style="width: 100%;">
+
+                    <div class="divider"></div>
+
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span class="label">Field of View (Zoom)</span>
+                            <span id="fov-display" class="value">65</span>°
+                        </div>
+                        <input type="range" id="fov-slider" min="30" max="110" value="65" class="slider">
                     </div>
-                    <div class="control-row" style="margin-top: 15px;">
-                        <label>Compass Offset: <span id="compass-display">0</span>°</label>
-                        <input type="range" id="compass-slider" min="-90" max="90" value="0" style="width: 100%;">
+
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span class="label">Compass Offset (Fix Heading)</span>
+                            <span id="compass-display" class="value">0</span>°
+                        </div>
+                        <input type="range" id="compass-slider" min="-180" max="180" value="0" class="slider">
                     </div>
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button id="reset-calibration-btn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Reset Defaults</button>
+
+                    <button id="reset-calibration" class="reset-btn">Reset All</button>
+                </div>
+            </div>
+
+            <!-- Search Help Modal -->
+            <div id="search-help-modal" class="glass-panel info-modal search-help-modal" style="display: none;">
+                <div class="info-header">
+                    <span class="info-title">How to "Jump" Locations</span>
+                    <button id="close-search-help-btn" class="close-btn">✖</button>
+                </div>
+                <div class="info-body">
+                    <div class="help-section">
+                        <h4>📱 On Mobile (Google Maps App)</h4>
+                        <ol>
+                            <li>Tap any spot on the map.</li>
+                            <li>Scroll up the bottom panel to find the <b>Plus Code</b> <i>(e.g., 83G4+QF
+                                    Stockholm)</i>.</li>
+                            <li><b>Tap the code</b> to copy it.</li>
+                            <li>Paste it into the search bar here!</li>
+                        </ol>
+                        <p style="font-size: 12px; color: #94a3b8; margin-top: 10px;"><i>Alternatively, tap the
+                                coordinates in the map drawer to copy them directly.</i></p>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="help-section">
+                        <h4>💻 On Desktop</h4>
+                        <p>Copy the full URL from your browser's address bar and paste it here, or use the plus code.
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <div class="status-panel">
-                <div class="glass-pill">
-                    <span id="status-indicator" class="dot loading"></span>
-                    <span id="status-msg">Initializing Sensors...</span>
+            <div class="bottom-bar">
+                <div class="search-container" id="search-container" style="display: none;">
+                    <div class="search-group">
+                        <input type="text" id="loc-search" placeholder="Search or paste Maps link..."
+                            class="glass-pill" />
+                        <button id="search-help-btn" class="help-btn">?</button>
+                    </div>
+                </div>
+                <div class="status-panel">
+                    <div class="glass-pill status-pill">
+                        <span id="status-indicator" class="dot loading"></span>
+                        <span id="status-msg">Initializing Sensors...</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="openlocationcode.js"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?v=weekly&libraries=places"></script>
     <script type="module" src="app.js"></script>
 </body>
 
