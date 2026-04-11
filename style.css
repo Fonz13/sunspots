@@ -355,10 +355,24 @@ p {
     cursor: pointer;
 }
 
+.bottom-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+    width: 100%;
+}
+
+.bottom-bar .search-container {
+    width: 100%;
+    pointer-events: auto; /* Required to click */
+}
+
 .status-panel {
     display: flex;
     justify-content: center;
-    padding-bottom: env(safe-area-inset-bottom, 20px);
+    pointer-events: auto; /* Required if user wants to click it later */
 }
 
 .glass-pill {
@@ -523,10 +537,8 @@ p {
     }
 
     .search-container {
-        order: 3;
-        flex: 0 0 100%; /* Force it to wrap onto its own row */
+        width: 100%;
         max-width: none;
-        margin-top: 10px;
     }
 
     .search-group {

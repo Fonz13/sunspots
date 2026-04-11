@@ -45,13 +45,6 @@
                     <button id="ar-mode-btn" class="active">📷 AR</button>
                     <button id="sv-mode-btn">🗺️ Street</button>
                 </div>
-                <div class="search-container" id="search-container" style="display: none;">
-                    <div class="search-group">
-                        <input type="text" id="loc-search" placeholder="Search or paste Maps link..."
-                            class="glass-pill" />
-                        <button id="search-help-btn" class="help-btn">?</button>
-                    </div>
-                </div>
                 <div class="date-picker-container">
                     <input type="date" id="date-picker" />
                 </div>
@@ -128,10 +121,19 @@
                 </div>
             </div>
 
-            <div class="status-panel">
-                <div class="glass-pill">
-                    <span id="status-indicator" class="dot loading"></span>
-                    <span id="status-msg">Initializing Sensors...</span>
+            <div class="bottom-bar">
+                <div class="search-container" id="search-container" style="display: none;">
+                    <div class="search-group">
+                        <input type="text" id="loc-search" placeholder="Search or paste Maps link..."
+                            class="glass-pill" />
+                        <button id="search-help-btn" class="help-btn">?</button>
+                    </div>
+                </div>
+                <div class="status-panel">
+                    <div class="glass-pill status-pill">
+                        <span id="status-indicator" class="dot loading"></span>
+                        <span id="status-msg">Initializing Sensors...</span>
+                    </div>
                 </div>
             </div>
         </div>
