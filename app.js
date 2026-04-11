@@ -297,9 +297,17 @@ function initStreetView() {
             const pov = panorama.getPov();
             currentHeading = pov.heading;
             currentPitch = pov.pitch;
-            // Limit max FOV to 125 degrees to prevent the sun path from distorting/disappearing at zoom 0
-            const rawFOV = 180 / Math.pow(2, panorama.getZoom());
-            CAMERA_LONG_EDGE_FOV = Math.min(125, rawFOV);
+            
+            // Attempt to read true FOV from POV, fallback to zoom formula
+            let fov;
+            if (pov.fov !== undefined) {
+                fov = pov.fov;
+            } else {
+                fov = 180 / Math.pow(2, panorama.getZoom());
+            }
+            
+            // Limit max FOV to 125 degrees to prevent distorting sun path
+            CAMERA_LONG_EDGE_FOV = Math.min(125, fov);
             
             fovSlider.value = CAMERA_LONG_EDGE_FOV;
             fovDisplay.textContent = Math.round(CAMERA_LONG_EDGE_FOV);
@@ -526,7 +534,9 @@ function getProjectedPoint(point, focalLength) {
         aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
         m = currentMatrix;
     } else if (currentMode === 'sv') {
-        aziRad = (point.azimuth + COMPASS_OFFSET) * Math.PI / 180;
+        // Use raw azimuth: SV imagery is already True-North aligned.
+        // COMPASS_OFFSET is removed here to prevent sensor calibration from affecting the map.
+        aziRad = point.azimuth * Math.PI / 180;
 
         // Construct 3D matrix for Street View (Heading, Pitch, 0 Roll)
         const h = currentHeading * Math.PI / 180;
