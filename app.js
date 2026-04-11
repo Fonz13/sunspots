@@ -19,26 +19,46 @@ const infoModal = document.getElementById('info-modal');
 const closeInfoBtn = document.getElementById('close-info-btn');
 const tzDisplay = document.getElementById('current-timezone');
 
-tzDisplay.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
-
-infoBtn.addEventListener('click', () => infoModal.style.display = 'block');
-closeInfoBtn.addEventListener('click', () => infoModal.style.display = 'none');
-
-function closeInfoOutside(e) {
-    if (infoModal.style.display === 'block' && 
-        !infoModal.contains(e.target) && 
-        !infoBtn.contains(e.target)) {
-        infoModal.style.display = 'none';
-    }
-}
-window.addEventListener('mousedown', closeInfoOutside);
-window.addEventListener('touchstart', closeInfoOutside);
-
 const arModeBtn = document.getElementById('ar-mode-btn');
 const svModeBtn = document.getElementById('sv-mode-btn');
 const searchContainer = document.getElementById('search-container');
 const locationInput = document.getElementById('loc-search');
 const svContainer = document.getElementById('street-view');
+const searchHelpBtn = document.getElementById('search-help-btn');
+const searchHelpModal = document.getElementById('search-help-modal');
+const closeSearchHelpBtn = document.getElementById('close-search-help-btn');
+
+tzDisplay.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
+
+// Modal Management Logic
+function closeAllModals() {
+    infoModal.style.display = 'none';
+    searchHelpModal.style.display = 'none';
+}
+
+function handleOutsideClick(e) {
+    // Check Settings Modal
+    if (infoModal.style.display === 'block' && 
+        !infoModal.contains(e.target) && 
+        !infoBtn.contains(e.target)) {
+        infoModal.style.display = 'none';
+    }
+    // Check Search Help Modal
+    if (searchHelpModal.style.display === 'block' && 
+        !searchHelpModal.contains(e.target) && 
+        !searchHelpBtn.contains(e.target)) {
+        searchHelpModal.style.display = 'none';
+    }
+}
+
+infoBtn.addEventListener('click', () => infoModal.style.display = 'block');
+closeInfoBtn.addEventListener('click', () => infoModal.style.display = 'none');
+
+searchHelpBtn.addEventListener('click', () => searchHelpModal.style.display = 'block');
+closeSearchHelpBtn.addEventListener('click', () => searchHelpModal.style.display = 'none');
+
+window.addEventListener('mousedown', handleOutsideClick);
+window.addEventListener('touchstart', handleOutsideClick);
 
 // State
 let userLat = null;

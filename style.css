@@ -102,6 +102,99 @@ p {
     box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
 }
 
+.mode-toggle button.active {
+    background: #f59e0b;
+    color: #1e293b;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.search-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.help-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.2s;
+    pointer-events: auto;
+}
+
+.help-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.search-help-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 320px;
+    z-index: 1000;
+}
+
+/* Specific positioning for Settings vs Search Help */
+#info-modal {
+    top: 76px;
+    right: 20px;
+    width: 260px;
+}
+
+.help-section h4 {
+    margin: 10px 0 5px 0;
+    color: #fef08a;
+}
+
+.help-section ol {
+    padding-left: 20px;
+    margin: 5px 0;
+}
+
+.help-section li {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #e2e8f0;
+}
+
+.divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 15px 0;
+}
+
+.help-section h4 {
+    margin: 10px 0 5px 0;
+    color: #fef08a;
+}
+
+.help-section ol {
+    padding-left: 20px;
+    margin: 5px 0;
+}
+
+.help-section li {
+    margin-bottom: 5px;
+}
+
+.divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 10px 0;
+}
+
 .glow-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
@@ -183,9 +276,6 @@ p {
 
 .info-modal {
     position: absolute;
-    top: 76px;
-    right: 20px;
-    width: 260px;
     padding: 20px;
     pointer-events: auto;
     animation: fadeIn 0.2s ease-out;
