@@ -113,7 +113,7 @@ compassSlider.addEventListener('input', (e) => {
     compassDisplay.textContent = e.target.value;
 });
 
-const resetCalibrationBtn = document.getElementById('reset-calibration-btn');
+const resetCalibrationBtn = document.getElementById('reset-calibration');
 if (resetCalibrationBtn) {
     resetCalibrationBtn.addEventListener('click', () => {
         CAMERA_LONG_EDGE_FOV = 65;
@@ -297,20 +297,8 @@ function initStreetView() {
             const pov = panorama.getPov();
             currentHeading = pov.heading;
             currentPitch = pov.pitch;
-            
-            // Attempt to read true FOV from POV, fallback to zoom formula
-            let fov;
-            if (pov.fov !== undefined) {
-                fov = pov.fov;
-            } else {
-                fov = 180 / Math.pow(2, panorama.getZoom());
-            }
-            
-            // Limit max FOV to 125 degrees to prevent distorting sun path
-            CAMERA_LONG_EDGE_FOV = Math.min(125, fov);
-            
-            fovSlider.value = CAMERA_LONG_EDGE_FOV;
-            fovDisplay.textContent = Math.round(CAMERA_LONG_EDGE_FOV);
+            // Street View FOV is now handled purely in renderLoop to protect AR settings
+
         }
     });
 
@@ -583,7 +571,16 @@ function renderLoop() {
         // In Street View, Google Maps FOV applies to the width. 
         // In AR mode, camera FOV usually applies to the long edge.
         const dimension = (currentMode === 'sv') ? canvas.width : Math.max(canvas.width, canvas.height);
-        const fovRad = CAMERA_LONG_EDGE_FOV * Math.PI / 180;
+        
+        let fovRad;
+        if (currentMode === 'sv') {
+            const pov = panorama.getPov();
+            const fov = pov.fov !== undefined ? pov.fov : 180 / Math.pow(2, panorama.getZoom());
+            fovRad = Math.min(125, fov) * Math.PI / 180;
+        } else {
+            fovRad = CAMERA_LONG_EDGE_FOV * Math.PI / 180;
+        }
+
         const focalLength = (dimension / 2) / Math.tan(fovRad / 2);
 
         ctx.save();
