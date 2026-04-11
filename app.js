@@ -586,7 +586,7 @@ function renderLoop() {
         if (currentMode === 'sv') {
             const pov = panorama.getPov();
             const fov = pov.fov !== undefined ? pov.fov : 180 / Math.pow(2, panorama.getZoom());
-            fovRad = Math.min(125, fov) * Math.PI / 180;
+            fovRad = Math.min(110, fov) * Math.PI / 180;
         } else {
             fovRad = CAMERA_LONG_EDGE_FOV * Math.PI / 180;
         }
