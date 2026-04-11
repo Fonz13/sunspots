@@ -253,11 +253,15 @@ async function setMode(mode) {
     }
 
     currentMode = mode;
+    
+    // Close any open modals when switching modes
+    closeAllModals();
 
     if (mode === 'ar') {
         arModeBtn.classList.add('active');
         svModeBtn.classList.remove('active');
         searchContainer.style.display = 'none';
+        infoBtn.style.display = 'flex'; // Show settings in AR
         video.style.display = 'block';
         svContainer.style.display = 'none';
         setStatus("Tracking Active", "active");
@@ -265,6 +269,7 @@ async function setMode(mode) {
         svModeBtn.classList.add('active');
         arModeBtn.classList.remove('active');
         searchContainer.style.display = 'block';
+        infoBtn.style.display = 'none'; // Hide settings in Street View
         video.style.display = 'none';
         svContainer.style.display = 'block';
         
