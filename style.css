@@ -115,25 +115,30 @@ p {
 }
 
 .help-btn {
-    width: 28px;
-    height: 28px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-weight: bold;
+    border: 2px solid rgba(255, 255, 255, 0.4) !important;
+    background: rgba(15, 23, 42, 0.95) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    color: #ffffff !important;
+    font-weight: 800;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 20px;
     transition: all 0.2s;
     pointer-events: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+    flex-shrink: 0;
 }
 
 .help-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: #0f172a !important;
     transform: scale(1.1);
+    border-color: #ffffff !important;
 }
 
 .search-help-modal {
@@ -330,7 +335,8 @@ p {
 }
 
 .date-picker-container input {
-    background: rgba(15, 23, 42, 0.6); /* Darker glassmorphism background for high contrast */
+    background: rgba(15, 23, 42, 0.6);
+    /* Darker glassmorphism background for high contrast */
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: #fff;
     border-radius: 12px;
@@ -459,12 +465,16 @@ p {
     width: 100%;
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: #ffffff !important;
     padding: 10px 20px;
     border-radius: 30px;
     font-family: inherit;
     font-size: 14px;
     outline: none;
+}
+
+.search-container input::placeholder {
+    color: #ffffff !important;
 }
 
 #street-view {
@@ -483,7 +493,7 @@ p {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 12px !important;
     margin-top: 5px !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
 }
 
 .pac-item {
@@ -511,6 +521,7 @@ p {
         flex-wrap: wrap;
         justify-content: center;
     }
+
     .search-container {
         order: 3;
         width: 100%;
