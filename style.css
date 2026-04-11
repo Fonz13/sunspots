@@ -529,3 +529,11 @@ p {
         margin-top: 10px;
     }
 }
+
+/* Hide Google Maps Dev API Error Popups completely */
+.gm-err-container {
+    display: none !important;
+}
+.dismissButton {
+    display: none !important;
+}

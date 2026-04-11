@@ -308,6 +308,16 @@ function initStreetView() {
         userLon = pos.lng();
         fetchSunPath(datePicker.value);
     });
+
+    // Auto-dismiss the "For development purposes only" error popup safely
+    const observer = new MutationObserver(() => {
+        const dismissBtn = document.querySelector('.dismissButton');
+        if (dismissBtn) {
+            dismissBtn.click();
+            observer.disconnect(); // Stop observing once it's clicked
+        }
+    });
+    observer.observe(svContainer, { childList: true, subtree: true });
 }
 
 async function resolveCompoundCode(plusPart, cityPart) {
