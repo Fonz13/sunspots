@@ -35,9 +35,19 @@
         <!-- AR Canvas Overlay -->
         <canvas id="ar-canvas"></canvas>
 
+        <!-- Google Street View Container -->
+        <div id="street-view" style="display: none;"></div>
+
         <!-- UI Overlay -->
         <div class="ui-overlay">
             <div class="top-bar">
+                <div class="mode-toggle glass-pill">
+                    <button id="ar-mode-btn" class="active">📷 AR</button>
+                    <button id="sv-mode-btn">🗺️ Street</button>
+                </div>
+                <div class="search-container" id="search-container" style="display: none;">
+                    <input type="text" id="location-input" placeholder="Search location..." class="glass-pill" />
+                </div>
                 <div class="date-picker-container">
                     <input type="date" id="date-picker" />
                 </div>
@@ -87,6 +97,7 @@
         </div>
     </div>
 
+    <script src="https://maps.googleapis.com/maps/api/js?v=weekly&libraries=places"></script>
     <script type="module" src="app.js"></script>
 </body>
 

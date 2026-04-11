@@ -63,6 +63,7 @@ h1 {
     margin-bottom: 12px;
     background: linear-gradient(to right, #fef08a, #f59e0b);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -331,5 +332,70 @@ p {
 
     50% {
         opacity: 0.4;
+    }
+}
+
+/* Mode Toggle & Search Styles */
+.mode-toggle {
+    display: flex;
+    padding: 4px;
+    gap: 4px;
+}
+
+.mode-toggle button {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mode-toggle button.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.search-container {
+    flex: 1;
+    max-width: 300px;
+}
+
+.search-container input {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+}
+
+#street-view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* Mobile search style adjustment */
+@media (max-width: 600px) {
+    .top-bar {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .search-container {
+        order: 3;
+        width: 100%;
+        max-width: none;
+        margin-top: 10px;
     }
 }

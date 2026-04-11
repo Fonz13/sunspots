@@ -34,6 +34,12 @@ function closeInfoOutside(e) {
 window.addEventListener('mousedown', closeInfoOutside);
 window.addEventListener('touchstart', closeInfoOutside);
 
+const arModeBtn = document.getElementById('ar-mode-btn');
+const svModeBtn = document.getElementById('sv-mode-btn');
+const searchContainer = document.getElementById('search-container');
+const locationInput = document.getElementById('location-input');
+const svContainer = document.getElementById('street-view');
+
 // State
 let userLat = null;
 let userLon = null;
@@ -42,6 +48,10 @@ let currentHeading = 0; // 0 = North
 let currentPitch = 0;   // 0 = Horizon
 let currentRoll = 0;    // 0 = Level
 let hasRealOrientation = false;
+
+let currentMode = 'ar'; // 'ar' or 'sv'
+let panorama = null;
+let autocomplete = null;
 
 // Constants (now dynamic via settings sliders)
 let CAMERA_LONG_EDGE_FOV = 65; 
@@ -130,6 +140,9 @@ startBtn.addEventListener('click', async () => {
         setupScreen.style.display = 'none';
         arContainer.style.display = 'block';
 
+        initModeToggles();
+        initAutocomplete();
+
         // Get Location
         setStatus("Finding location...");
         navigator.geolocation.getCurrentPosition(
@@ -198,11 +211,99 @@ function fetchSunPath(dateStr) {
         }
         
         sunPath = path;
-        setStatus("Tracking Active", "active");
+        setStatus(currentMode === 'ar' ? "Tracking Active" : "Street View Mode", "active");
     } catch (e) {
         console.error(e);
         setStatus("Failed to calculate path", "error");
     }
+}
+
+function initModeToggles() {
+    arModeBtn.addEventListener('click', () => setMode('ar'));
+    svModeBtn.addEventListener('click', () => setMode('sv'));
+}
+
+async function setMode(mode) {
+    if (currentMode === mode) return;
+
+    if (mode === 'sv' && (!userLat || !userLon)) {
+        setStatus("Waiting for location...", "loading");
+        // Keep trying or just wait for the first geolocation success to trigger it
+        return;
+    }
+
+    currentMode = mode;
+
+    if (mode === 'ar') {
+        arModeBtn.classList.add('active');
+        svModeBtn.classList.remove('active');
+        searchContainer.style.display = 'none';
+        video.style.display = 'block';
+        svContainer.style.display = 'none';
+        setStatus("Tracking Active", "active");
+    } else {
+        svModeBtn.classList.add('active');
+        arModeBtn.classList.remove('active');
+        searchContainer.style.display = 'block';
+        video.style.display = 'none';
+        svContainer.style.display = 'block';
+        
+        if (!panorama) {
+            initStreetView();
+        }
+        setStatus("Street View Mode", "active");
+    }
+}
+
+function initStreetView() {
+    panorama = new google.maps.StreetViewPanorama(svContainer, {
+        position: { lat: userLat, lng: userLon },
+        pov: { heading: currentHeading, pitch: currentPitch },
+        zoom: 1,
+        addressControl: false,
+        showRoadLabels: false,
+        zoomControl: false,
+        panControl: false,
+        fullscreenControl: false
+    });
+
+    panorama.addListener('pov_changed', () => {
+        if (currentMode === 'sv') {
+            const pov = panorama.getPov();
+            currentHeading = pov.heading;
+            currentPitch = pov.pitch;
+            // Approximate FOV from zoom level
+            // zoom 0 = ~180deg, zoom 1 = ~90deg, zoom 2 = ~45deg
+            CAMERA_LONG_EDGE_FOV = 180 / Math.pow(2, panorama.getZoom());
+            fovSlider.value = CAMERA_LONG_EDGE_FOV;
+            fovDisplay.textContent = Math.round(CAMERA_LONG_EDGE_FOV);
+        }
+    });
+
+    panorama.addListener('position_changed', () => {
+        const pos = panorama.getPosition();
+        userLat = pos.lat();
+        userLon = pos.lng();
+        fetchSunPath(datePicker.value);
+    });
+}
+
+function initAutocomplete() {
+    if (!google.maps.places) return;
+    autocomplete = new google.maps.places.Autocomplete(locationInput);
+    autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry && place.geometry.location) {
+            const loc = place.geometry.location;
+            if (panorama && currentMode === 'sv') {
+                panorama.setPosition(loc);
+            } else {
+                userLat = loc.lat();
+                userLon = loc.lng();
+                fetchSunPath(datePicker.value);
+            }
+        }
+    });
 }
 
 function handleOrientation(event) {
@@ -280,10 +381,54 @@ function angleDifference(a, b) {
     return diff;
 }
 
+// Unified projection helper that handles both Matrix (AR) and Euler (SV)
+function getProjectedPoint(point, focalLength, canvasWidth, canvasHeight) {
+    const altRad = point.altitude * Math.PI / 180;
+    
+    if (currentMode === 'ar' && currentMatrix) {
+        // Apply iOS arbitrary alpha alignment fix (locks the matrix to True North)
+        const iosOffset = currentHeading - currentMatrixHeading;
+        const aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
+        
+        // World unit vector 
+        const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
+        const wy = Math.cos(altRad) * Math.cos(aziRad);  // North
+        const wz = Math.sin(altRad);                     // Up
+        
+        // Multiply World Vector by INVERSE Rotation Matrix (M^T) to get Camera Local Vector
+        const m = currentMatrix;
+        const lx = m[0] * wx + m[3] * wy + m[6] * wz;
+        const ly = m[1] * wx + m[4] * wy + m[7] * wz;
+        const lz = m[2] * wx + m[5] * wy + m[8] * wz;
+        
+        if (lz >= 0) return null; // Behind camera
+        
+        return {
+            x: (lx / -lz) * focalLength,
+            y: -(ly / -lz) * focalLength
+        };
+    } else if (currentMode === 'sv') {
+        // For Street View, we use spherical-to-rectilinear projection directly from Euler angles
+        let dHeading = angleDifference(point.azimuth + COMPASS_OFFSET, currentHeading);
+        let dPitch = point.altitude - currentPitch;
+
+        // Simple rectilinear projection for small/medium FOVs
+        // For SV, we assume no roll
+        const x = Math.tan(dHeading * Math.PI / 180) * focalLength;
+        const y = -Math.tan(dPitch * Math.PI / 180) * focalLength;
+
+        // Check if it's within a reasonable field of view (approx 90 deg) to avoid wrap-around glitched lines
+        if (Math.abs(dHeading) > 90) return null;
+
+        return { x, y };
+    }
+    return null;
+}
+
 function renderLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (sunPath.length > 0 && currentMatrix) {
+    if (sunPath.length > 0 && (currentMatrix || currentMode === 'sv')) {
         
         // Use true 3D Rectilinear (Gnomonic) Projection for exact physical lens matching
         const maxDimension = Math.max(canvas.width, canvas.height);
@@ -299,31 +444,7 @@ function renderLoop() {
 
         // Project a sun position helper
         const project3D = (point) => {
-            const altRad = point.altitude * Math.PI / 180;
-            
-            // Apply iOS arbitrary alpha alignment fix (locks the matrix to True North)
-            const iosOffset = currentHeading - currentMatrixHeading;
-            // Apply arbitrary compass offset from user Settings
-            const aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
-            
-            // World unit vector 
-            const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
-            const wy = Math.cos(altRad) * Math.cos(aziRad);  // North
-            const wz = Math.sin(altRad);                     // Up
-            
-            // Multiply World Vector by INVERSE Rotation Matrix (M^T) to get Camera Local Vector
-            const m = currentMatrix;
-            const lx = m[0] * wx + m[3] * wy + m[6] * wz;
-            const ly = m[1] * wx + m[4] * wy + m[7] * wz;
-            const lz = m[2] * wx + m[5] * wy + m[8] * wz;
-            
-            if (lz >= 0) return null; // Behind camera
-            
-            // Map to Screen projection coordinates
-            return {
-                x: (lx / -lz) * focalLength,
-                y: -(ly / -lz) * focalLength  // Screen Y is inverse of mathematical Y
-            };
+            return getProjectedPoint(point, focalLength, canvas.width, canvas.height);
         };
 
         // Draw Sun Path line using pure 3D projection
