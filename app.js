@@ -161,7 +161,7 @@ startBtn.addEventListener('click', async () => {
         arContainer.style.display = 'block';
 
         initModeToggles();
-        initAutocomplete();
+        initSearch();
 
         // Get Location
         setStatus("Finding location...");
@@ -309,30 +309,100 @@ function initStreetView() {
     });
 }
 
-function initAutocomplete() {
-    if (!google.maps.places) return;
-    autocomplete = new google.maps.places.Autocomplete(locationInput);
-    
-    // Original autocomplete listener
-    autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry && place.geometry.location) {
-            const loc = place.geometry.location;
-            updateToLocation(loc.lat(), loc.lng());
+async function resolveCompoundCode(plusPart, cityPart) {
+    try {
+        setStatus(`Finding ${cityPart}...`, "loading");
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityPart)}&format=json&limit=1`);
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+            const cityLat = parseFloat(data[0].lat);
+            const cityLon = parseFloat(data[0].lon);
+            
+            const fullCode = OpenLocationCode.recoverNearest(plusPart, cityLat, cityLon);
+            if (OpenLocationCode.isFull(fullCode)) {
+                const decoded = OpenLocationCode.decode(fullCode);
+                updateToLocation(decoded.latitudeCenter, decoded.longitudeCenter);
+                locationInput.value = `📍 ${fullCode}`;
+                locationInput.blur();
+                setStatus("Location Synchronized", "active");
+            }
+        } else {
+            setStatus("Could not find city", "error");
         }
-    });
-
-    // New: Listen for pasted Google Maps URLs
+    } catch (e) {
+        console.error("Compound Resolution Error:", e);
+        setStatus("Network Error", "error");
+    }
+}
+async function initSearch() {
+    // 2. Listen for pasting Google Maps URLs or direct coordinates
     locationInput.addEventListener('input', () => {
-        const val = locationInput.value;
+        const val = locationInput.value.trim();
+        if (!val) return;
+
+        // 1. Check for Full URLs
         if (val.includes('google.com/maps') || val.includes('maps.app.goo.gl')) {
-            // Regex for @lat,lng
             const atRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-            // Regex for !3d...!4d
             const dataRegex = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
-            
             let match = val.match(dataRegex) || val.match(atRegex);
+            if (match) {
+                const lat = parseFloat(match[1]);
+                const lon = parseFloat(match[2]);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    updateToLocation(lat, lon);
+                    locationInput.value = `Pos: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                    locationInput.blur();
+                    return;
+                }
+            }
             
+            // If it's a short link, we unfortunately can't parse it in JS without an API/Backend
+            if (val.includes('maps.app.goo.gl')) {
+                setStatus("Short links require API Key", "loading");
+            }
+        } 
+        // 2. Check for Plus Codes (e.g., 8FVC9G7F+9V, 82HG+M3, or P45J+M4 Glendale)
+        else if (val.includes('+')) {
+            const plusCodeRegex = /[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,8}/i;
+            const match = val.match(plusCodeRegex);
+            
+            if (match && typeof OpenLocationCode !== 'undefined') {
+                const code = match[0].toUpperCase();
+                const remainder = val.replace(match[0], '').trim();
+
+                // If there's a city/locality name after the code
+                if (remainder && remainder.length > 2) {
+                    resolveCompoundCode(code, remainder);
+                } else {
+                    try {
+                        let fullCode = code;
+                        // Local recovery using current location
+                        if (OpenLocationCode.isShort(code)) {
+                            if (userLat !== null && userLon !== null) {
+                                fullCode = OpenLocationCode.recoverNearest(code, userLat, userLon);
+                            } else {
+                                setStatus("Need location to use short code", "loading");
+                                return;
+                            }
+                        }
+
+                        if (OpenLocationCode.isFull(fullCode)) {
+                            const decoded = OpenLocationCode.decode(fullCode);
+                            updateToLocation(decoded.latitudeCenter, decoded.longitudeCenter);
+                            locationInput.value = `📍 ${fullCode}`;
+                            locationInput.blur();
+                        }
+                    } catch (e) {
+                        console.error("Plus Code Error:", e);
+                    }
+                }
+            }
+        }
+        // 3. Check for Direct Coordinates (Lat, Lon)
+        else {
+            const coordRegex = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+            const match = val.match(coordRegex);
             if (match) {
                 const lat = parseFloat(match[1]);
                 const lon = parseFloat(match[2]);
@@ -342,6 +412,13 @@ function initAutocomplete() {
                     locationInput.blur();
                 }
             }
+        }
+    });
+
+    // Support for "Enter" key
+    locationInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            locationInput.blur();
         }
     });
 }
