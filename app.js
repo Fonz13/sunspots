@@ -500,6 +500,8 @@ function handleOrientation(event) {
         heading = matrixHeading;
     }
 
+    if (currentMode !== 'ar') return;
+
     currentHeading = heading;
     currentPitch = pitch;
     currentRoll = roll;
@@ -513,48 +515,54 @@ function angleDifference(a, b) {
     return diff;
 }
 
-// Unified projection helper that handles both Matrix (AR) and Euler (SV)
-function getProjectedPoint(point, focalLength, canvasWidth, canvasHeight) {
+function getProjectedPoint(point, focalLength) {
     const altRad = point.altitude * Math.PI / 180;
-    
+    let aziRad;
+    let m;
+
     if (currentMode === 'ar' && currentMatrix) {
         // Apply iOS arbitrary alpha alignment fix (locks the matrix to True North)
         const iosOffset = currentHeading - currentMatrixHeading;
-        const aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
-        
-        // World unit vector 
-        const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
-        const wy = Math.cos(altRad) * Math.cos(aziRad);  // North
-        const wz = Math.sin(altRad);                     // Up
-        
-        // Multiply World Vector by INVERSE Rotation Matrix (M^T) to get Camera Local Vector
-        const m = currentMatrix;
-        const lx = m[0] * wx + m[3] * wy + m[6] * wz;
-        const ly = m[1] * wx + m[4] * wy + m[7] * wz;
-        const lz = m[2] * wx + m[5] * wy + m[8] * wz;
-        
-        if (lz >= 0) return null; // Behind camera
-        
-        return {
-            x: (lx / -lz) * focalLength,
-            y: -(ly / -lz) * focalLength
-        };
+        aziRad = (point.azimuth + COMPASS_OFFSET - iosOffset) * Math.PI / 180;
+        m = currentMatrix;
     } else if (currentMode === 'sv') {
-        // For Street View, we use spherical-to-rectilinear projection directly from Euler angles
-        let dHeading = angleDifference(point.azimuth + COMPASS_OFFSET, currentHeading);
-        let dPitch = point.altitude - currentPitch;
+        aziRad = (point.azimuth + COMPASS_OFFSET) * Math.PI / 180;
 
-        // Simple rectilinear projection for small/medium FOVs
-        // For SV, we assume no roll
-        const x = Math.tan(dHeading * Math.PI / 180) * focalLength;
-        const y = -Math.tan(dPitch * Math.PI / 180) * focalLength;
+        // Construct 3D matrix for Street View (Heading, Pitch, 0 Roll)
+        const h = currentHeading * Math.PI / 180;
+        const p = currentPitch * Math.PI / 180;
+        const cH = Math.cos(h);
+        const sH = Math.sin(h);
+        const cP = Math.cos(p);
+        const sP = Math.sin(p);
 
-        // Check if it's within a reasonable field of view (approx 90 deg) to avoid wrap-around glitched lines
-        if (Math.abs(dHeading) > 90) return null;
-
-        return { x, y };
+        // Matrix columns are Camera Axes in World Space
+        // m[0,3,6] = Cam X, m[1,4,7] = Cam Y, m[2,5,8] = Cam Z
+        m = [
+            cH, -sH * sP, -sH * cP,
+            -sH, -cH * sP, -cH * cP,
+            0, cP, -sP
+        ];
+    } else {
+        return null;
     }
-    return null;
+
+    // World unit vector 
+    const wx = Math.cos(altRad) * Math.sin(aziRad);  // East
+    const wy = Math.cos(altRad) * Math.cos(aziRad);  // North
+    const wz = Math.sin(altRad);                     // Up
+
+    // Multiply World Vector by INVERSE Rotation Matrix (M^T) to get Camera Local Vector
+    const lx = m[0] * wx + m[3] * wy + m[6] * wz;
+    const ly = m[1] * wx + m[4] * wy + m[7] * wz;
+    const lz = m[2] * wx + m[5] * wy + m[8] * wz;
+
+    if (lz >= 0) return null; // Behind camera
+
+    return {
+        x: (lx / -lz) * focalLength,
+        y: -(ly / -lz) * focalLength
+    };
 }
 
 function renderLoop() {
@@ -562,10 +570,11 @@ function renderLoop() {
 
     if (sunPath.length > 0 && (currentMatrix || currentMode === 'sv')) {
         
-        // Use true 3D Rectilinear (Gnomonic) Projection for exact physical lens matching
-        const maxDimension = Math.max(canvas.width, canvas.height);
+        // In Street View, Google Maps FOV applies to the width. 
+        // In AR mode, camera FOV usually applies to the long edge.
+        const dimension = (currentMode === 'sv') ? canvas.width : Math.max(canvas.width, canvas.height);
         const fovRad = CAMERA_LONG_EDGE_FOV * Math.PI / 180;
-        const focalLength = (maxDimension / 2) / Math.tan(fovRad / 2);
+        const focalLength = (dimension / 2) / Math.tan(fovRad / 2);
 
         ctx.save();
         
@@ -576,7 +585,7 @@ function renderLoop() {
 
         // Project a sun position helper
         const project3D = (point) => {
-            return getProjectedPoint(point, focalLength, canvas.width, canvas.height);
+            return getProjectedPoint(point, focalLength);
         };
 
         // Draw Sun Path line using pure 3D projection
